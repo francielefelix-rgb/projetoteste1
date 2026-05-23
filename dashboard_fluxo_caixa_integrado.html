@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fluxo de Caixa - Dashboard Integrado</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --primary: #1E3A5F;
+            --primary-light: #2E5A8F;
+            --success: #10B981;
+            --danger: #EF4444;
+            --warning: #F59E0B;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text: #1E293B;
+            --text-light: #64748B;
+            --border: #E2E8F0;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+        }
+
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: 0 4px 20px rgba(30, 58, 95, 0.3);
+        }
+
+        .header h1 { font-size: 1.5rem; font-weight: 600; }
+        .header p { opacity: 0.9; font-size: 0.9rem; margin-top: 0.25rem; }
+
+        .container { max-width: 1600px; margin: 0 auto; padding: 1.5rem; }
+
+        /* PLANILHA EDITÁVEL */
+        .spreadsheet-section {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+            overflow-x: auto;
+        }
+
+        .section-title {
+            font-size: 1.2rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .spreadsheet-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            min-width: 1200px;
+        }
+
+        .spreadsheet-table th {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem 0.5rem;
+            font-weight: 600;
+            text-align: center;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+
+        .spreadsheet-table th:first-child { border-radius: 8px 0 0 0; }
+        .spreadsheet-table th:last-child { border-radius: 0 8px 0 0; }
+
+        .spreadsheet-table td {
+            padding: 0;
+            border: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .spreadsheet-table td:first-child {
+            background: #F8FAFC;
+            font-weight: 600;
+            text-align: left;
+            padding: 0.75rem 0.5rem;
+        }
+
+        .spreadsheet-table tr:hover td:not(:first-child) {
+            background: #F0F9FF;
+        }
+
+        .editable-cell {
+            width: 100%;
+            padding: 0.75rem 0.5rem;
+            border: none;
+            background: transparent;
+            text-align: center;
+            font-family: inherit;
+            font-size: 0.85rem;
+            outline: none;
+            transition: background 0.2s;
+        }
+
+        .editable-cell:focus {
+            background: #FEF3C7;
+            box-shadow: inset 0 0 0 2px var(--warning);
+        }
+
+        .editable-cell.positive { color: var(--success); }
+        .editable-cell.negative { color: var(--danger); }
+        .editable-cell.zero { color: var(--text-light); }
+
+        .spreadsheet-table tfoot td {
+            background: #F1F5F9;
+            font-weight: 700;
+            padding: 0.75rem 0.5rem;
+        }
+
+        .spreadsheet-table tfoot td:first-child {
+            background: #F1F5F9;
+        }
+
+        /* DASHBOARD */
+        .dashboard-section { margin-bottom: 2rem; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .kpi-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+            border-left: 4px solid var(--primary);
+            transition: transform 0.2s;
+        }
+
+        .kpi-card:hover { transform: translateY(-2px); }
+
+        .kpi-card .label {
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.5rem;
+        }
+
+        .kpi-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .kpi-card .value.positive { color: var(--success); }
+        .kpi-card .value.negative { color: var(--danger); }
+        .kpi-card .value.neutral { color: var(--text); }
+
+        .kpi-card .subtitle {
+            font-size: 0.8rem;
+            color: var(--text-light);
+            margin-top: 0.25rem;
+        }
+
+        /* Gráficos */
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .chart-card h3 {
+            font-size: 1rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-container { position: relative; height: 300px; }
+
+        /* Tabela Resumo */
+        .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+            margin-bottom: 1.5rem;
+            background: var(--card-bg);
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .summary-table th {
+            background: var(--primary);
+            color: white;
+            padding: 0.75rem;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .summary-table th:first-child { text-align: left; }
+
+        .summary-table td {
+            padding: 0.6rem 0.75rem;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .summary-table td:first-child { text-align: left; font-weight: 500; }
+
+        .summary-table tr:hover { background: #F8FAFC; }
+
+        .summary-table tr.highlight { background: rgba(239, 68, 68, 0.08); }
+        .summary-table tr.highlight:hover { background: rgba(239, 68, 68, 0.12); }
+
+        .cell-positive { color: var(--success); font-weight: 600; }
+        .cell-negative { color: var(--danger); font-weight: 600; }
+
+        /* Análise de Riscos */
+        .risks-card {
+            background: var(--card-bg);
+            border-radius: 12px;
+            padding: 1.25rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+
+        .risks-card h3 {
+            font-size: 1rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .risk-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+
+        .risk-table th {
+            background: #F8FAFC;
+            color: var(--text);
+            padding: 0.6rem;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .risk-table td {
+            padding: 0.6rem;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .risk-table tr:hover { background: #F8FAFC; }
+
+        .risk-level {
+            display: inline-block;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .risk-level.alto { background: rgba(239, 68, 68, 0.15); color: var(--danger); }
+        .risk-level.medio-alto { background: rgba(245, 158, 11, 0.15); color: #D97706; }
+        .risk-level.medio { background: rgba(251, 191, 36, 0.15); color: #B45309; }
+
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+            font-size: 0.8rem;
+        }
+
+        /* Info box */
+        .info-box {
+            background: #FEF3C7;
+            border: 1px solid #F59E0B;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .info-box .icon { font-size: 1.25rem; }
+        .info-box .text { font-size: 0.85rem; color: #92400E; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>💰 Fluxo de Caixa Sintético - Obra em Curitiba</h1>
+        <p>Dashboard Integrado | Edite os valores na planilha e veja o dashboard atualizar automaticamente</p>
+    </div>
+
+    <div class="container">
+        <!-- PLANILHA EDITÁVEL -->
+        <div class="spreadsheet-section">
+            <h2 class="section-title">📊 Planilha Editável - Fluxo de Caixa</h2>
+            <div class="info-box">
+                <span class="icon">💡</span>
+                <span class="text"><strong>Dica:</strong> Edite qualquer valor nas células. O dashboard abaixo atualiza automaticamente em tempo real!</span>
+            </div>
+            <table class="spreadsheet-table" id="spreadsheet">
+                <thead>
+                    <tr>
+                        <th>Mês</th>
+                        <th>Ingressos</th>
+                        <th>Receita</th>
+                        <th>Adiantamentos</th>
+                        <th>Insumos</th>
+                        <th>Mão de Obra</th>
+                        <th>Subcontratados</th>
+                        <th>Serviços Terceiros</th>
+                        <th>Saldo Mensal</th>
+                        <th>Saldo Acumulado</th>
+                    </tr>
+                </thead>
+                <tbody id="spreadsheet-body">
+                    <!-- Dados preenchidos via JavaScript -->
+                </tbody>
+                <tfoot id="spreadsheet-foot">
+                    <tr>
+                        <td><strong>TOTAL</strong></td>
+                        <td id="total-ingressos">0</td>
+                        <td id="total-receita">0</td>
+                        <td id="total-adiantamentos">0</td>
+                        <td id="total-insumos">0</td>
+                        <td id="total-mo">0</td>
+                        <td id="total-subcontratados">0</td>
+                        <td id="total-servicos">0</td>
+                        <td id="total-saldo-mensal">0</td>
+                        <td>-</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="dashboard-section">
+            <h2 class="section-title">📈 Dashboard Visual</h2>
+
+            <!-- KPIs -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="label">Receita Total Projetada</div>
+                    <div class="value positive" id="kpi-receita">R$ 0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Custo Total</div>
+                    <div class="value negative" id="kpi-custo">R$ 0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Resultado Projetado</div>
+                    <div class="value negative" id="kpi-resultado">R$ 0</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="label">Maior Saldo Negativo</div>
+                    <div class="value negative" id="kpi-maior-neg">R$ 0</div>
+                    <div class="subtitle" id="kpi-maior-neg-mes">-</div>
+                </div>
+            </div>
+
+            <!-- Gráficos -->
+            <div class="charts-grid">
+                <div class="chart-card">
+                    <h3>📈 Evolução do Saldo Acumulado e Mensal</h3>
+                    <div class="chart-container">
+                        <canvas id="cashFlowChart"></canvas>
+                    </div>
+                </div>
+                <div class="chart-card">
+                    <h3>📊 Composição de Custos</h3>
+                    <div class="chart-container">
+                        <canvas id="costChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tabela Resumo -->
+            <table class="summary-table">
+                <thead>
+                    <tr>
+                        <th>Mês</th>
+                        <th>Ingressos</th>
+                        <th>Saídas (Total)</th>
+                        <th>Saldo Mensal</th>
+                        <th>Saldo Acumulado</th>
+                    </tr>
+                </thead>
+                <tbody id="summary-body">
+                    <!-- Preenchido via JS -->
+                </tbody>
+            </table>
+
+            <!-- Análise de Riscos -->
+            <div class="risks-card">
+                <h3>⚠️ Análise de Riscos</h3>
+                <table class="risk-table">
+                    <thead>
+                        <tr>
+                            <th>Risco</th>
+                            <th>Probabilidade</th>
+                            <th>Impacto</th>
+                            <th>Nível</th>
+                            <th>Mitigação</th>
+                        </tr>
+                    </thead>
+                    <tbody id="risks-body">
+                        <!-- Preenchido via JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        Dashboard Integrado de Fluxo de Caixa | Atualizado em tempo real
+    </div>
+
+    <script>
+        // Dados iniciais do PDF
+        const dadosIniciais = [
+            { mes: 'Dez/24', ingresos: 0, receita: 0, adiantamentos: 0, insumos: 0, mo: 0, subcontratados: 0, servicos: 0 },
+            { mes: 'Jan/25', ingresos: 0, receita: 0, adiantamentos: 0, insumos: -35000, mo: -35000, subcontratados: -65000, servicos: -16500 },
+            { mes: 'Fev/25', ingresos: 0, receita: 0, adiantamentos: 0, insumos: -35000, mo: -35000, subcontratados: -70000, servicos: -20000 },
+            { mes: 'Mar/25', ingresos: 0, receita: 0, adiantamentos: 0, insumos: -50000, mo: -35000, subcontratados: -75000, servicos: -30000 },
+            { mes: 'Abr/25', ingresos: 0, receita: 0, adiantamentos: 0, insumos: -100000, mo: -35000, subcontratados: -100000, servicos: -45000 },
+            { mes: 'Mai/25', ingresos: 400000, receita: 400000, adiantamentos: 0, insumos: -75000, mo: -35000, subcontratados: -90000, servicos: -45000 },
+            { mes: 'Jun/25', ingresos: 300000, receita: 300000, adiantamentos: 0, insumos: -90000, mo: -35000, subcontratados: -100000, servicos: -55000 },
+            { mes: 'Jul/25', ingresos: 250000, receita: 250000, adiantamentos: 0, insumos: -85000, mo: -35000, subcontratados: -100000, servicos: -50000 },
+            { mes: 'Ago/25', ingresos: 250000, receita: 250000, adiantamentos: 0, insumos: -75000, mo: -35000, subcontratados: -75000, servicos: -35000 },
+            { mes: 'Set/25', ingresos: 300000, receita: 300000, adiantamentos: 0, insumos: -120000, mo: -35000, subcontratados: -100000, servicos: -65000 },
+            { mes: 'Out/25', ingresos: 500000, receita: 500000, adiantamentos: 0, insumos: -170000, mo: -65000, subcontratados: -155000, servicos: -60000 },
+            { mes: 'Nov/25', ingresos: 550000, receita: 500000, adiantamentos: 50000, insumos: -185000, mo: -65000, subcontratados: -180000, servicos: -70000 },
+            { mes: 'Dez/25', ingresos: 600000, receita: 600000, adiantamentos: 0, insumos: -185000, mo: -65000, subcontratados: -180000, servicos: -65000 },
+            { mes: 'Jan/26', ingresos: 550000, receita: 550000, adiantamentos: 0, insumos: -175000, mo: -65000, subcontratados: -175000, servicos: -65000 },
+            { mes: 'Fev/26', ingresos: 700000, receita: 700000, adiantamentos: 0, insumos: -210000, mo: -65000, subcontratados: -250000, servicos: -65000 },
+            { mes: 'Mar/26', ingresos: 400000, receita: 400000, adiantamentos: 0, insumos: -185000, mo: -65000, subcontratados: -180000, servicos: -65000 },
+            { mes: 'Abr/26', ingresos: 200000, receita: 200000, adiantamentos: 0, insumos: -150000, mo: -65000, subcontratados: -140000, servicos: -65000 }
+        ];
+
+        // Riscos
+        const riscos = [
+            { nome: '📈 Variação cambial (insumos importados)', prob: 'Média', impacto: 'Alto', nivel: 'medio-alto', mitigacao: 'Cotar com 3 fornecedores, hedge cambial' },
+            { nome: '⏰ Atraso na entrega de insumos', prob: 'Média', impacto: 'Alto', nivel: 'medio-alto', mitigacao: 'Estoque de segurança, múltiplos fornecedores' },
+            { nome: '📦 Inflação de preços de materiais', prob: 'Alta', impacto: 'Alto', nivel: 'alto', mitigacao: 'Contratos com preço fixo, indexação' },
+            { nome: '⚖️ Custos legais/parametrização', prob: 'Baixa', impacto: 'Muito Alto', nivel: 'medio-alto', mitigacao: 'Due diligence, assessoria jurídica' },
+            { nome: '🌧️ Condições climáticas adversas', prob: 'Alta', impacto: 'Médio', nivel: 'medio-alto', mitigacao: 'Cronograma flexível, planejamento sazonal' },
+            { nome: '👷 Greve de trabalhadores', prob: 'Baixa', impacto: 'Alto', nivel: 'medio', mitigacao: 'Diálogo contínuo, complying com CLT' },
+            { nome: '📋 Atraso em aprovações de projetos', prob: 'Média', impacto: 'Médio', nivel: 'medio', mitigacao: 'Gestão antecipada, equipe dedicada' },
+            { nome: '🏠 Demanda menor que prevista', prob: 'Baixa', impacto: 'Alto', nivel: 'medio', mitigacao: 'Estudos de mercado, flexibilidade de produto' }
+        ];
+
+        let dados = JSON.parse(JSON.stringify(dadosIniciais));
+        let charts = {};
+
+        // Formatar valor em reais
+        function formatar(valor) {
+            return valor.toLocaleString('pt-BR');
+        }
+
+        // Formatar célula com classe
+        function formatarCelula(valor) {
+            if (valor > 0) return { texto: 'R$ ' + formatar(valor), classe: 'positive' };
+            if (valor < 0) return { texto: 'R$ ' + formatar(valor), classe: 'negative' };
+            return { texto: '-', classe: 'zero' };
+        }
+
+        // Calcular saídas de uma linha
+        function calcularSaidas(row) {
+            return row.insumos + row.mo + row.subcontratados + row.servicos;
+        }
+
+        // Renderizar planilha
+        function renderSpreadsheet() {
+            const tbody = document.getElementById('spreadsheet-body');
+            let saldoAcumulado = 0;
+
+            tbody.innerHTML = dados.map((row, idx) => {
+                const saidas = calcularSaidas(row);
+                const saldoMensal = row.ingresos + saidas;
+                saldoAcumulado += saldoMensal;
+
+                const fmtIngresos = formatarCelula(row.ingresos);
+                const fmtReceita = formatarCelula(row.receita);
+                const fmtAdiantamentos = formatarCelula(row.adiantamentos);
+                const fmtInsumos = formatarCelula(row.insumos);
+                const fmtMo = formatarCelula(row.mo);
+                const fmtSub = formatarCelula(row.subcontratados);
+                const fmtServicos = formatarCelula(row.servicos);
+                const fmtSaldoMensal = formatarCelula(saldoMensal);
+                const fmtSaldoAcum = formatarCelula(saldoAcumulado);
+
+                return `
+                    <tr>
+                        <td>${row.mes}</td>
+                        <td><input class="editable-cell ${fmtIngresos.classe}" type="number" value="${row.ingresos}" data-row="${idx}" data-field="ingresos"></td>
+                        <td><input class="editable-cell ${fmtReceita.classe}" type="number" value="${row.receita}" data-row="${idx}" data-field="receita"></td>
+                        <td><input class="editable-cell ${fmtAdiantamentos.classe}" type="number" value="${row.adiantamentos}" data-row="${idx}" data-field="adiantamentos"></td>
+                        <td><input class="editable-cell ${fmtInsumos.classe}" type="number" value="${row.insumos}" data-row="${idx}" data-field="insumos"></td>
+                        <td><input class="editable-cell ${fmtMo.classe}" type="number" value="${row.mo}" data-row="${idx}" data-field="mo"></td>
+                        <td><input class="editable-cell ${fmtSub.classe}" type="number" value="${row.subcontratados}" data-row="${idx}" data-field="subcontratados"></td>
+                        <td><input class="editable-cell ${fmtServicos.classe}" type="number" value="${row.servicos}" data-row="${idx}" data-field="servicos"></td>
+                        <td class="${fmtSaldoMensal.classe}" style="background: ${saldoMensal < 0 ? 'rgba(239,68,68,0.08)' : 'rgba(16,185,129,0.08)'}; font-weight: 600;">${fmtSaldoMensal.texto}</td>
+                        <td class="${fmtSaldoAcum.classe}" style="font-weight: 600;">${fmtSaldoAcum.texto}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Adicionar event listeners
+            document.querySelectorAll('.editable-cell').forEach(input => {
+                input.addEventListener('change', function() {
+                    const row = parseInt(this.dataset.row);
+                    const field = this.dataset.field;
+                    dados[row][field] = parseFloat(this.value) || 0;
+                    renderSpreadsheet();
+                    renderDashboard();
+                });
+            });
+        }
+
+        // Renderizar dashboard
+        function renderDashboard() {
+            // Calcular totais
+            let totalIngressos = 0, totalCusto = 0;
+            let saldoAcumulado = 0, maiorNegativo = 0, mesMaiorNeg = '';
+            const monthlyBalance = [];
+            const cumulativeBalance = [];
+
+            dados.forEach(row => {
+                const saidas = calcularSaidas(row);
+                const saldoMensal = row.ingresos + saidas;
+                saldoAcumulado += saldoMensal;
+
+                totalIngressos += row.ingresos;
+                totalCusto += Math.abs(saidas);
+
+                monthlyBalance.push(saldoMensal);
+                cumulativeBalance.push(saldoAcumulado);
+
+                if (saldoAcumulado < maiorNegativo) {
+                    maiorNegativo = saldoAcumulado;
+                    mesMaiorNeg = row.mes;
+                }
+            });
+
+            // Atualizar KPIs
+            const resultado = totalIngressos - totalCusto;
+            document.getElementById('kpi-receita').textContent = 'R$ ' + formatar(totalIngressos);
+            document.getElementById('kpi-custo').textContent = 'R$ ' + formatar(totalCusto);
+            document.getElementById('kpi-resultado').textContent = 'R$ ' + formatar(resultado);
+            document.getElementById('kpi-maior-neg').textContent = 'R$ ' + formatar(maiorNegativo);
+            document.getElementById('kpi-maior-neg-mes').textContent = mesMaiorNeg;
+
+            // Totais na planilha
+            let totalInsumos = 0, totalMo = 0, totalSub = 0, totalServ = 0;
+            dados.forEach(row => {
+                totalInsumos += Math.abs(row.insumos);
+                totalMo += Math.abs(row.mo);
+                totalSub += Math.abs(row.subcontratados);
+                totalServ += Math.abs(row.servicos);
+            });
+
+            document.getElementById('total-ingressos').textContent = 'R$ ' + formatar(totalIngressos);
+            document.getElementById('total-receita').textContent = 'R$ ' + formatar(dados.reduce((sum, r) => sum + r.receita, 0));
+            document.getElementById('total-adiantamentos').textContent = 'R$ ' + formatar(dados.reduce((sum, r) => sum + r.adiantamentos, 0));
+            document.getElementById('total-insumos').textContent = 'R$ ' + formatar(totalInsumos);
+            document.getElementById('total-mo').textContent = 'R$ ' + formatar(totalMo);
+            document.getElementById('total-subcontratados').textContent = 'R$ ' + formatar(totalSub);
+            document.getElementById('total-servicos').textContent = 'R$ ' + formatar(totalServ);
+            document.getElementById('total-saldo-mensal').textContent = 'R$ ' + formatar(resultado);
+
+            // Atualizar gráficos
+            updateCharts(monthlyBalance, cumulativeBalance, [totalInsumos, totalMo, totalSub, totalServ]);
+
+            // Renderizar tabela resumo
+            renderSummaryTable();
+
+            // Renderizar riscos
+            renderRisks();
+        }
+
+        function renderSummaryTable() {
+            const tbody = document.getElementById('summary-body');
+            let saldoAcumulado = 0;
+            let maiorNeg = 0;
+            let mesNeg = '';
+
+            tbody.innerHTML = dados.map(row => {
+                const saidas = calcularSaidas(row);
+                const saldoMensal = row.ingresos + saidas;
+                saldoAcumulado += saldoMensal;
+
+                if (saldoAcumulado < maiorNeg) {
+                    maiorNeg = saldoAcumulado;
+                    mesNeg = row.mes;
+                }
+
+                const fmtIngressos = row.ingresos > 0 ? `cell-positive` : '';
+                const fmtSaidas = formatarCelula(saidas);
+                const fmtSaldoMensal = formatarCelula(saldoMensal);
+                const fmtSaldoAcum = formatarCelula(saldoAcumulado);
+                const isHighlight = saldoAcumulado === maiorNeg;
+
+                return `
+                    <tr class="${isHighlight ? 'highlight' : ''}">
+                        <td>${row.mes}</td>
+                        <td class="${fmtIngressos}">${row.ingresos > 0 ? 'R$ ' + formatar(row.ingresos) : '-'}</td>
+                        <td>${saidas !== 0 ? 'R$ ' + formatar(saidas) : '-'}</td>
+                        <td class="${fmtSaldoMensal.classe}">${fmtSaldoMensal.texto}</td>
+                        <td class="${fmtSaldoAcum.classe}">${fmtSaldoAcum.texto}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderRisks() {
+            const tbody = document.getElementById('risks-body');
+            tbody.innerHTML = riscos.map(r => `
+                <tr>
+                    <td>${r.nome}</td>
+                    <td>${r.prob}</td>
+                    <td>${r.impacto}</td>
+                    <td><span class="risk-level ${r.nivel}">${r.nivel.toUpperCase()}</span></td>
+                    <td>${r.mitigacao}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateCharts(monthlyBalance, cumulativeBalance, costs) {
+            const months = dados.map(d => d.mes);
+
+            // Gráfico de linha/barras
+            if (charts.cashFlow) charts.cashFlow.destroy();
+
+            const ctx = document.getElementById('cashFlowChart').getContext('2d');
+            charts.cashFlow = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: months,
+                    datasets: [
+                        {
+                            type: 'line',
+                            label: 'Saldo Acumulado',
+                            data: cumulativeBalance,
+                            borderColor: '#EF4444',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            yAxisID: 'y',
+                            order: 1
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Saldo Mensal',
+                            data: monthlyBalance,
+                            backgroundColor: monthlyBalance.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.7)' : 'rgba(239, 68, 68, 0.7)'),
+                            yAxisID: 'y1',
+                            order: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { position: 'top' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => ctx.dataset.label + ': R$ ' + formatar(ctx.raw)
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            position: 'left',
+                            title: { display: true, text: 'Saldo Acumulado' },
+                            ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' }
+                        },
+                        y1: {
+                            type: 'linear',
+                            position: 'right',
+                            title: { display: true, text: 'Saldo Mensal' },
+                            ticks: { callback: v => 'R$ ' + (v/1000).toFixed(0) + 'k' },
+                            grid: { drawOnChartArea: false }
+                        },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // Gráfico de pizza
+            if (charts.cost) charts.cost.destroy();
+
+            const ctxCost = document.getElementById('costChart').getContext('2d');
+            charts.cost = new Chart(ctxCost, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Insumos', 'Mão de Obra', 'Subcontratados', 'Serviços Terceiros'],
+                    datasets: [{
+                        data: costs,
+                        backgroundColor: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '55%',
+                    plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                            callbacks: {
+                                label: ctx => {
+                                    const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                                    const pct = ((ctx.raw / total) * 100).toFixed(1);
+                                    return ctx.label + ': R$ ' + formatar(ctx.raw) + ' (' + pct + '%)';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Inicializar
+        renderSpreadsheet();
+        renderDashboard();
+    </script>
+</body>
+</html>
